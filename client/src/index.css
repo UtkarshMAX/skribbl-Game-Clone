@@ -1,0 +1,159 @@
+@import "tailwindcss";
+
+/* ---------- Design tokens (one visual language for every screen) ---------- */
+@theme {
+  --font-sans: "Nunito", ui-rounded, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-ink: #0f1f44;          /* dark navy text */
+  --color-page: #f3f7ff;         /* very light blue page */
+
+  --radius-card: 24px;           /* cards 20–28px */
+  --radius-control: 14px;        /* buttons + inputs 12–16px */
+  --radius-badge: 10px;          /* small badges 10–12px */
+
+  --shadow-soft: 0 1px 2px rgb(15 31 68 / 0.05), 0 6px 16px -8px rgb(15 31 68 / 0.18);
+  --shadow-card: 0 1px 2px rgb(15 31 68 / 0.05), 0 16px 40px -18px rgb(15 31 68 / 0.28);
+}
+
+html, body {
+  background: var(--color-page);
+  color: var(--color-ink);
+}
+
+.app-bg {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow-x: hidden;
+}
+
+/* ---------- Decorative backdrop (medium) ---------- */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background-color: var(--color-page);
+  background-image: radial-gradient(rgb(15 31 68 / 0.07) 1.5px, transparent 1.5px);
+  background-size: 26px 26px;
+}
+.backdrop-blob {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform;
+}
+.backdrop-blob-a {
+  width: 46vmax; height: 46vmax;
+  top: -18vmax; left: -14vmax;
+  background: radial-gradient(circle, rgb(147 197 253 / 0.45) 0%, transparent 70%);
+  animation: drift-a 24s ease-in-out infinite alternate;
+}
+.backdrop-blob-b {
+  width: 40vmax; height: 40vmax;
+  bottom: -16vmax; right: -12vmax;
+  background: radial-gradient(circle, rgb(252 211 77 / 0.30) 0%, transparent 70%);
+  animation: drift-b 30s ease-in-out infinite alternate;
+}
+.doodle {
+  position: absolute;
+  line-height: 1;
+  opacity: 0.45;
+  animation: doodle-float 9s ease-in-out infinite alternate;
+}
+.doodle svg { display: block; }
+
+@keyframes drift-a { to { transform: translate(6vmax, 4vmax) scale(1.05); } }
+@keyframes drift-b { to { transform: translate(-5vmax, -4vmax) scale(1.04); } }
+@keyframes doodle-float {
+  from { transform: translateY(0) rotate(-6deg); }
+  to   { transform: translateY(-14px) rotate(6deg); }
+}
+
+/* ---------- Smooth blue focus ring (keyboard focus) ---------- */
+@layer base {
+  button, input, select, a, [tabindex] {
+    outline: 3px solid transparent;
+    outline-offset: 5px;
+    transition: outline-color 0.15s ease, outline-offset 0.15s ease;
+  }
+}
+:focus-visible {
+  outline: 3px solid #3b82f6 !important;
+  outline-offset: 2px !important;
+}
+
+/* ---------- Animations (subtle, consistent) ---------- */
+@keyframes fade    { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rise    { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes pop-in  { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes slide-in { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+@keyframes score-pop { 0% { transform: scale(1); } 40% { transform: scale(1.35); color: #d97706; } 100% { transform: scale(1); } }
+@keyframes pulse-dot { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+
+.animate-fade     { animation: fade 0.3s ease-out both; }
+.animate-rise     { animation: rise 0.35s ease-out both; }
+.animate-pop-in   { animation: pop-in 0.2s ease-out both; }
+.animate-slide-in { animation: slide-in 0.3s ease-out both; }
+.animate-score    { animation: score-pop 0.45s ease-out; }
+.waiting-dot      { animation: pulse-dot 1.4s ease-in-out infinite; }
+.waiting-dot:nth-child(2) { animation-delay: 0.2s; }
+.waiting-dot:nth-child(3) { animation-delay: 0.4s; }
+
+.avatar { transition: transform 0.2s ease; }
+.avatar:hover { transform: scale(1.06); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- Tooltip ---------- */
+.tooltip-bubble {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  translate: -50% 4px;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: var(--radius-badge);
+  background: var(--color-ink);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, translate 0.15s ease;
+  z-index: 20;
+}
+@media (hover: hover) {
+  .tooltip:hover .tooltip-bubble { opacity: 1; translate: -50% 0; }
+}
+.tooltip:has(:focus-visible) .tooltip-bubble { opacity: 1; translate: -50% 0; }
+
+/* ---------- Keyboard hint ---------- */
+kbd {
+  font-family: inherit;
+  font-size: 0.75em;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  border-bottom-width: 2px;
+  background: #f8fafc;
+  color: #475569;
+}
+
+/* ---------- Scrollbar ---------- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgb(15 31 68 / 0.18); border-radius: 999px; }
