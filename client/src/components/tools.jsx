@@ -1,4 +1,3 @@
-import React from 'react'
 import socket from '../socket/socket';
 import { Card, IconButton } from '../ui';
 

@@ -91,6 +91,7 @@ export default class Game {
         this.phase = "lobby";
         this.turnPoints = {};
         this.turnStartedAt = null;
+        this.room.droppedPlayers?.clear(); // seats can only be taken back within the same game
     }
 
     // ---------- Who may see / do what ----------
@@ -452,11 +453,31 @@ export default class Game {
             [...this.room.players].sort((a, b) => b.score - a.score).map((p) => p.toPublicJSON())
         );
 
-        const remainingPlayers = this.room.players.filter(
-            p => p.id !== this.currentDrawerId);
-
-        if (this.guessedPlayers.length >= remainingPlayers.length) {
+        if (this.everyoneGuessed()) {
             this.endRound();
+        }
+    }
+
+    // True when every player still in the room (except the drawer) has guessed. Checks the
+    // current players, not a count: people who guessed and then left must not end the turn early.
+    everyoneGuessed() {
+        const guessers = this.room.players.filter((p) => p.id !== this.currentDrawerId);
+        return guessers.length > 0 && guessers.every((p) => this.guessedPlayers.includes(p.id));
+    }
+
+    /**
+     * A dropped player took their seat back with a new socket id: carry this turn's guess state
+     * and points over, so they can't guess (and score) a second time.
+     */
+    playerReconnected(oldId, player) {
+        const index = this.guessedPlayers.indexOf(oldId);
+        if (index !== -1) {
+            this.guessedPlayers[index] = player.id;
+            player.hasGuessedThisRound = true;
+        }
+        if (oldId in this.turnPoints) {
+            this.turnPoints[player.id] = this.turnPoints[oldId];
+            delete this.turnPoints[oldId];
         }
     }
 

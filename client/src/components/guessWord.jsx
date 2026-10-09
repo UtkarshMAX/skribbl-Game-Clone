@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import socket from '../socket/socket';
 import { Badge, Card, IconButton, Input } from '../ui';
 

@@ -27,6 +27,23 @@ export default class Room {
 
         this.bannedClientIds = new Set(); // persistent client ids the host has banned
         this.voteKicks = new Map();       // targetPlayerId -> Set of voter ids
+        // Players whose connection dropped during the running game (page refresh, network blip):
+        // clientId -> { id, score } (id = old socket id). Lets them rejoin the same game as a player.
+        // Cleared by Game.reset().
+        this.droppedPlayers = new Map();
+    }
+
+    /** Remembers a player whose connection dropped mid-game so they can take their seat back. */
+    rememberDroppedPlayer(player) {
+        if (this.gameStarted && player.clientId) this.droppedPlayers.set(player.clientId, { id: player.id, score: player.score });
+    }
+
+    /** Returns (and forgets) the saved state of a dropped player, or null. */
+    takeDroppedPlayer(clientId) {
+        if (!this.gameStarted || typeof clientId !== "string" || !this.droppedPlayers.has(clientId)) return null;
+        const saved = this.droppedPlayers.get(clientId);
+        this.droppedPlayers.delete(clientId);
+        return saved;
     }
 
     // ---------- Moderation ----------

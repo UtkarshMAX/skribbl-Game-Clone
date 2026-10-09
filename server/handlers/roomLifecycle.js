@@ -7,7 +7,7 @@
  * ending the game when fewer than 2 active players remain, or skipping to the next
  * turn if the drawer left. Returns the removed Player, or null.
  */
-export function removePlayerFromRoom(rooms, room, socketId, { message } = {}) {
+export function removePlayerFromRoom(rooms, room, socketId, { message, dropped = false } = {}) {
     // A spectator leaving only removes the spectator: host, drawer, scores, turn order and
     // the game itself are untouched.
     const spectator = room.removeSpectator(socketId);
@@ -30,6 +30,8 @@ export function removePlayerFromRoom(rooms, room, socketId, { message } = {}) {
     room.game.beforePlayerRemoved(socketId); // keep the turn order pointing at the right player
     const player = room.removePlayer(socketId);
     if (!player) return null;
+    // Only a dropped connection (not leave / kick / ban) can take the seat back in this game.
+    if (dropped) room.rememberDroppedPlayer(player);
 
     room.clearVotesFor(socketId);
 
@@ -55,6 +57,8 @@ export function removePlayerFromRoom(rooms, room, socketId, { message } = {}) {
         room.game.endGame();
     } else if (wasDrawer) {
         room.game.nextTurn();
+    } else if (room.gameStarted && room.game.phase === "drawing" && room.game.everyoneGuessed()) {
+        room.game.endRound(); // the only ones who hadn't guessed yet just left
     }
     return player;
 }

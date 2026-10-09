@@ -1,0 +1,18 @@
+# Render Blueprint for the Socket.IO game server (Render → New → Blueprint → pick this repo).
+# Only used when the service is created from a Blueprint; services created in the dashboard
+# (like the current scribble-game-3aex) keep their dashboard settings and ignore this file.
+services:
+  - type: web
+    name: scribble-server
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.12.0
+      # Comma-separated allowed browser origins, e.g. https://scribble-client-x4zy.onrender.com
+      - key: CLIENT_URL
+        sync: false

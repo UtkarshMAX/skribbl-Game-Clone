@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom';
 import socket from '../socket/socket.js';
 import WordBox from '../components/wordbox';
@@ -48,9 +48,6 @@ const DrawBoard = ({ isSpectator = false, hostId = "" }) => {
 
     const getCursor = () => {
         if (socket.id !== currentDrawerId) return 'default';
-        const s = Math.max(brushSize + 10, 16);
-        const h = s / 2;
-        const inner = Math.max(brushSize / 2, 3);
         if (tool === 'eraser') {
             return `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><circle cx='12' cy='12' r='10' fill='%23ccc' fill-opacity='0.3' stroke='%23999' stroke-width='1.5'/><circle cx='12' cy='12' r='4' fill='%23999' stroke='%23777' stroke-width='1'/></svg>") 12 12, auto`;
         }
@@ -210,7 +207,6 @@ const DrawBoard = ({ isSpectator = false, hostId = "" }) => {
         setIsDrawing(true);
         
         const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
         const rect = canvas.getBoundingClientRect();
         const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
         const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
@@ -349,7 +345,7 @@ const DrawBoard = ({ isSpectator = false, hostId = "" }) => {
                 )}
                 {nextDrawerName && (
                     <p className='mt-4 text-sm font-bold text-slate-500'>
-                        Next up: <span className='text-ink'>{nextDrawerName}</span> 🎨
+                        Next up: <span className='text-ink'>{displayName(nextDrawerName)}</span> 🎨
                     </p>
                 )}
                 {replayButton && <div className='mt-4 flex justify-center'>{replayButton}</div>}

@@ -235,6 +235,163 @@ test("before the game starts everyone joins as a player (the client can't ask to
     assert.deepEqual(await join(late, roomCode, "Late8"), { success: false, message: "Room is full" });
 });
 
+// A page refresh / dropped connection = the old socket disconnects and a new one arrives.
+// The game page must join_room again; sync_game alone (without joining) gets nothing.
+// (A2 has a different clientId here = a different browser, so it may only watch.)
+test("mid-game: a new connection gets nothing until it joins; from another browser it watches as a spectator", async () => {
+    const { roomCode, socks } = await lobby(["Host9", "Amy9", "Bob9"], { hintCount: 0 });
+    const [H, A, B] = socks;
+    const { words } = await startGame(socks, roomCode);
+    H.emit("word_chosen", { roomCode, word: words[0] });
+    await waitFor(A, "word_selected");
+    H.emit("draw_start", { roomCode, x: 10, y: 10, color: "red", size: 5 });
+    H.emit("draw_end");
+    await waitFor(A, "draw_start");
+
+    A.close();
+    await waitFor(H, "player_left", (p) => p.name === "Amy9");
+    const A2 = await client("Amy9b");
+    A2.emit("sync_game", { roomCode });
+    await sleep(300);
+    assert.equal(received(A2, "game_snapshot").length, 0, "a non-member gets no snapshot (why the page must re-join)");
+
+    assert.deepEqual(await join(A2, roomCode, "Amy9"), { success: true, role: "spectator", gameStarted: true });
+    const snap = await waitFor(A2, "game_snapshot");
+    assert.equal(snap.gameState.phase, "drawing");
+    assert.equal(snap.strokes.length, 1, "existing drawing is restored");
+    assert.deepEqual(await join(A2, roomCode, "Amy9"), { success: true, role: "spectator", gameStarted: true }, "re-joining on reconnect is idempotent");
+    const r = await room(H, roomCode);
+    assert.deepEqual(r.spectators.map((s) => s.name), ["Amy9"]);
+    assert.deepEqual(r.players.map((p) => p.name).sort(), ["Bob9", "Host9"]);
+
+    // The game keeps going for the remaining players.
+    B.emit("guess", { roomCode, guess: words[0] });
+    const end = await waitFor(A2, "round_end");
+    assert.deepEqual(end.scores.map((s) => s.name).sort(), ["Bob9", "Host9"]);
+});
+
+// Same browser (same clientId) after a dropped connection = take the seat back.
+const reconnect = async (old, label) => { const s = await client(label); s.clientId = old.clientId; return s; };
+
+test("refresh mid-game (same browser): the player takes their seat back with their score and can't score twice", async () => {
+    const { roomCode, socks } = await lobby(["Host11", "Amy11", "Bob11"], { hintCount: 0 });
+    const [H, A, B] = socks;
+    const { words } = await startGame(socks, roomCode);
+    H.emit("word_chosen", { roomCode, word: words[0] });
+    await waitFor(A, "word_selected");
+    A.emit("guess", { roomCode, guess: words[0] });
+    const { points } = await waitFor(H, "guess_result", (r) => r.correct && r.playerName === "Amy11");
+
+    A.close();
+    await waitFor(H, "player_left", (p) => p.name === "Amy11");
+    const A2 = await reconnect(A, "Amy11b");
+    assert.deepEqual(await join(A2, roomCode, "Amy11"), { success: true, role: "player", gameStarted: true });
+    await waitFor(H, "chat_message", (m) => m.text === "Amy11 rejoined the game");
+    const r = await room(H, roomCode);
+    assert.deepEqual(r.players.map((p) => p.name), ["Host11", "Bob11", "Amy11"], "back at the end of the turn order");
+    assert.equal(r.players.find((p) => p.name === "Amy11").score, points, "score kept");
+    assert.deepEqual(r.spectators, []);
+
+    // Already guessed this turn before the refresh: a second guess must not score.
+    A2.emit("guess", { roomCode, guess: words[0] });
+    await sleep(300);
+    assert.equal(received(H, "guess_result").filter((g) => g.correct && g.playerName === "Amy11").length, 1, "no double score");
+
+    // The seat is taken once: a second connection with the same clientId only watches.
+    const A3 = await reconnect(A, "Amy11c");
+    assert.equal((await join(A3, roomCode, "Amy11")).role, "spectator");
+
+    B.emit("guess", { roomCode, guess: words[0] });
+    const end = await waitFor(A2, "round_end");
+    const amy = end.scores.find((s) => s.name === "Amy11");
+    assert.equal(amy.score, points);
+    assert.equal(amy.earned, points, "this turn's points carried over to the new connection");
+});
+
+test("only a dropped connection can take a seat back: leaving or being kicked mid-game rejoins as spectator", async () => {
+    const { roomCode, socks } = await lobby(["Host12", "Amy12", "Bob12", "Cat12"], { hintCount: 0 });
+    const [H, A, B] = socks;
+    await startGame(socks, roomCode);
+
+    A.emit("leave_room", { roomCode });
+    await waitFor(H, "player_left", (p) => p.name === "Amy12");
+    A.close();
+    assert.equal((await join(await reconnect(A, "Amy12b"), roomCode, "Amy12")).role, "spectator", "left on purpose");
+
+    H.emit("kick_player", { roomCode, playerId: B.id });
+    await waitFor(H, "player_left", (p) => p.name === "Bob12");
+    B.close();
+    assert.equal((await join(await reconnect(B, "Bob12b"), roomCode, "Bob12")).role, "spectator", "kicked");
+});
+
+test("a saved seat doesn't carry over into a new game", async () => {
+    const { roomCode, socks } = await lobby(["Host13", "Amy13", "Bob13"], { maxRounds: 2, drawTime: 15 });
+    const [H, A, B] = socks;
+    await startGame(socks, roomCode);
+    A.close();
+    await waitFor(H, "player_left", (p) => p.name === "Amy13");
+    // Amy's seat is saved; then Bob drops too, which ends the game (< 2 players). New game after Play again.
+    B.close();
+    await waitFor(H, "game_over");
+    H.emit("play_again", { roomCode });
+    await waitFor(H, "returned_to_lobby");
+    const C = await client("Cat13");
+    await join(C, roomCode, "Cat13");
+    C.emit("toggle_ready", { roomCode });
+    await sleep(200);
+    H.emit("start_game", { roomCode });
+    await waitFor(H, "word_options", () => true, 8000);
+    assert.equal((await join(await reconnect(A, "Amy13b"), roomCode, "Amy13")).role, "spectator", "old seat from the previous game is gone");
+});
+
+// ---------- "Everyone guessed" with players leaving ----------
+
+test("a guesser who leaves doesn't end the turn early for players who haven't guessed", async () => {
+    const { roomCode, socks } = await lobby(["Host14", "Amy14", "Bob14", "Cat14"], { hintCount: 0 });
+    const [H, A, B, C] = socks;
+    const { words } = await startGame(socks, roomCode);
+    H.emit("word_chosen", { roomCode, word: words[0] });
+    await waitFor(C, "word_selected");
+    A.emit("guess", { roomCode, guess: words[0] });
+    await waitFor(H, "guess_result", (r) => r.correct && r.playerName === "Amy14");
+    A.emit("leave_room", { roomCode });
+    await waitFor(H, "player_left", (p) => p.name === "Amy14");
+    B.emit("guess", { roomCode, guess: words[0] });
+    await waitFor(H, "guess_result", (r) => r.correct && r.playerName === "Bob14");
+    await sleep(300);
+    assert.equal(received(C, "round_end").length, 0, "Cat hasn't guessed yet, the turn must go on");
+    C.emit("guess", { roomCode, guess: words[0] });
+    await waitFor(C, "round_end");
+});
+
+test("when the last player who hadn't guessed leaves, the turn ends right away", async () => {
+    const { roomCode, socks } = await lobby(["Host15", "Amy15", "Bob15"], { hintCount: 0, drawTime: 240 });
+    const [H, A, B] = socks;
+    const { words } = await startGame(socks, roomCode);
+    H.emit("word_chosen", { roomCode, word: words[0] });
+    await waitFor(A, "word_selected");
+    A.emit("guess", { roomCode, guess: words[0] });
+    await waitFor(H, "guess_result", (r) => r.correct);
+    B.emit("leave_room", { roomCode });
+    const end = await waitFor(H, "round_end", () => true, 2000);
+    assert.equal(end.word, words[0]);
+});
+
+test("refresh in a 2-player game: the game ends, and re-joining reports no running game (client goes to the lobby)", async () => {
+    const { roomCode, socks } = await lobby(["Host10", "Amy10"]);
+    const [H, A] = socks;
+    const { words } = await startGame(socks, roomCode);
+    H.emit("word_chosen", { roomCode, word: words[0] });
+    await waitFor(A, "word_selected");
+
+    A.close();
+    await waitFor(H, "game_over");
+    const A2 = await client("Amy10b");
+    assert.deepEqual(await join(A2, roomCode, "Amy10"), { success: true, role: "player", gameStarted: false });
+    const r = await room(H, roomCode);
+    assert.deepEqual(r.players.map((p) => p.name), ["Host10", "Amy10"]);
+});
+
 // ---------- 4.4 custom words, 4.7 language ----------
 
 test("custom words: validated, only the host sees the list, game uses them", async () => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import socket from '../socket/socket';
 import { Card, Timer, displayName } from '../ui';
 
@@ -23,11 +23,13 @@ const WordBox = (props) => {
         };
     }, [])
 
-    useEffect(() => {
-        if (socket.id !== props.drawerId) {
-            setWord("");
-        }
-    }, [props.drawerId]);
+    // When the drawer changes, forget the previous word unless we are the new drawer
+    // (adjusting state during render instead of in an effect avoids an extra render pass).
+    const [prevDrawerId, setPrevDrawerId] = useState(props.drawerId);
+    if (props.drawerId !== prevDrawerId) {
+        setPrevDrawerId(props.drawerId);
+        if (socket.id !== props.drawerId) setWord("");
+    }
 
     const isDrawer = socket.id === props.drawerId;
     const choosing = props.choosing;

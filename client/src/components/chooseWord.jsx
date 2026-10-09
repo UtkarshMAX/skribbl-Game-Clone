@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import { useRef, useState } from "react";
 import socket from "../socket/socket";
 import { Modal, SecondaryButton, Timer } from "../ui";
 

@@ -69,18 +69,24 @@ export default function registerRoomEvents(handler) {
 
             if (room.isBanned(payload.clientId)) return reply({ success: false, message: "You are banned from this room" });
 
+            if (!isValidName(playerName)) return reply({ success: false, message: "Invalid player name" });
+
             // Works the same for public and private rooms (the code/link is the invitation).
-            // Role is decided by the server: before the game starts -> player, once it's running -> spectator.
-            const role = room.gameStarted ? "spectator" : "player";
+            // Role is decided by the server: before the game starts -> player, once it's running -> spectator,
+            // except a player whose connection dropped during this game: they take their seat (and score) back.
+            const saved = room.gameStarted && !room.isFull() ? room.takeDroppedPlayer(payload.clientId) : null;
+            const role = room.gameStarted && !saved ? "spectator" : "player";
             if (role === "player" && room.isFull()) return reply({ success: false, message: "Room is full" });
             if (role === "spectator" && room.spectators.length >= MAX_SPECTATORS) {
                 return reply({ success: false, message: "Too many spectators in this room" });
             }
 
-            if (!isValidName(playerName)) return reply({ success: false, message: "Invalid player name" });
-
             const args = [socket.id, playerName, cleanAvatar(avatar), cleanClientId(payload.clientId)];
             const member = role === "player" ? room.addPlayer(new Player(...args)) : room.addSpectator(new Spectator(...args));
+            if (saved) { // back at the end of the turn order, score and this turn's guess kept
+                member.score = saved.score;
+                room.game.playerReconnected(saved.id, member);
+            }
             socket.join(roomCode);
 
             reply({ success: true, role, gameStarted: room.gameStarted });
@@ -93,7 +99,8 @@ export default function registerRoomEvents(handler) {
             room.broadcast("chat_message", {
                 id: crypto.randomUUID(),
                 type: "system",
-                text: role === "spectator" ? `${member.name} is watching as a spectator` : `${member.name} joined the room`
+                text: role === "spectator" ? `${member.name} is watching as a spectator`
+                    : saved ? `${member.name} rejoined the game` : `${member.name} joined the room`
             });
         },
     });
@@ -199,7 +206,7 @@ export default function registerRoomEvents(handler) {
 
     handler.onDisconnect(({ socket, rooms }) => {
         for (const room of [...rooms.rooms.values()]) {
-            removePlayerFromRoom(rooms, room, socket.id);
+            removePlayerFromRoom(rooms, room, socket.id, { dropped: true });
         }
     });
 }

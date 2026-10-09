@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import socket from "../socket/socket";
 import toast from "react-hot-toast";
@@ -19,7 +19,7 @@ const Lobby = () => {
     const [customWordsText, setCustomWordsText] = useState(""); // host only
 
     // Applies any lobby payload from the server (player_list_update / get_room / settings_updated).
-    const applyLobbyState = (data) => {
+    const applyLobbyState = useCallback((data) => {
         if (data.players) setPlayers(data.players);
         if (data.spectators) setSpectators(data.spectators);
         if (data.hostId) setHostId(data.hostId);
@@ -28,7 +28,7 @@ const Lobby = () => {
         if (Array.isArray(data.customWords)) setCustomWordsText(data.customWords.join(", "));
         // Arriving while a game is running (spectator / invite link) -> straight to the game screen.
         if (data.gameStarted) navigate(`/playground/${roomCode}`);
-    };
+    }, [navigate, roomCode]);
 
     useEffect(() => {
         const handlePlayerListUpdate = (data) => {
@@ -60,7 +60,7 @@ const Lobby = () => {
             socket.off("custom_words", handleCustomWords);
         };
 
-    }, [navigate, roomCode]);
+    }, [navigate, roomCode, applyLobbyState]);
 
     useEffect(() => {
         const playerName = localStorage.getItem("name")?.trim() || "Player";
@@ -92,7 +92,7 @@ const Lobby = () => {
         // (joining twice on the same connection is harmless — the server just says "already in").
         socket.on("connect", joinLobby);
         return () => socket.off("connect", joinLobby);
-    }, [roomCode, navigate]);
+    }, [roomCode, navigate, applyLobbyState]);
 
     const startGame = () => {
         socket.emit("start_game", { roomCode });

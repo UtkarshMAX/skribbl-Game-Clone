@@ -3,8 +3,7 @@ import Avatar from './Avatar.jsx';
 import Badge from './Badge.jsx';
 import Score from './Score.jsx';
 import PlayerMenu from './PlayerMenu.jsx';
-
-export const displayName = (name = '') => name.charAt(0).toUpperCase() + name.slice(1);
+import { displayName } from './displayName.js';
 
 export default function PlayerCard({ player, isHost, isDrawing, isYou, isReady, rank, showScore = true, actions = [], className = '' }) {
   const isSpectator = !!player.isSpectator;

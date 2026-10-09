@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 import DrawBoard from '../components/drawBoard';
 import ChatBox from '../components/chatbox';
 import PlayerList from '../components/playerlist';
 import socket from '../socket/socket';
 import { Badge, Logo } from '../ui';
+import { getClientId } from '../utils/clientId.js';
 
 const Playground = () => {
 
+  const navigate = useNavigate();
   const { roomCode } = useParams();
   const [players, setPlayers] = useState([]);
   const [spectators, setSpectators] = useState([]);
@@ -50,12 +53,37 @@ const Playground = () => {
   }, []);
 
   useEffect(() => {
-    socket.emit("get_room", { roomCode }, (response) => {
-      if (response.success) applyRoom(response);
-    });
-    // Full game picture (state, strokes, word-choice countdown, chat) for whoever just opened this screen.
-    socket.emit("sync_game", { roomCode });
-  }, [roomCode]);
+    const playerName = localStorage.getItem("name")?.trim() || "Player";
+    const emoji_array = ['🙂', '😎', '💀', '😁', '😡', '🫣', '🌚', '😋', '😉', '😍', '🫡', '😪', '😌', '🥸', '🤠', '🤡', '😇', '🤖', '👾', '👽', '👻', '🦁', '🦊'];
+    const avatar = emoji_array[Number(localStorage.getItem("emojiIndex")) || 0] || '😀';
+
+    // A page refresh or a dropped connection gives this tab a new socket id that is no longer in
+    // the room, so join (again) before asking for the room — the server just reports the role if we
+    // are still in, and makes us a spectator if the game is already running.
+    const joinGame = () => {
+      socket.emit("join_room", { roomCode, playerName, avatar, clientId: getClientId() }, (response) => {
+        if (!response?.success) {
+          toast.error(response?.message || "Failed to join room");
+          navigate("/");
+          return;
+        }
+        // No game running (e.g. our leaving ended a 2-player game): the lobby is the right screen.
+        if (!response.gameStarted) {
+          navigate(`/room/${roomCode}`, { replace: true });
+          return;
+        }
+        socket.emit("get_room", { roomCode }, (res) => {
+          if (res.success) applyRoom(res);
+        });
+        // Full game picture (state, strokes, word-choice countdown, chat) for whoever just opened this screen.
+        socket.emit("sync_game", { roomCode });
+      });
+    };
+
+    joinGame();
+    socket.on("connect", joinGame);
+    return () => socket.off("connect", joinGame);
+  }, [roomCode, navigate]);
 
   // The server decides the role; the client only mirrors it to choose what to show.
   const role = spectators.some((s) => s.id === socket.id) ? "spectator" : "player";
