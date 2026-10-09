@@ -8,8 +8,7 @@ Drawing, chat, timers and scores are synchronised live over WebSockets.
 
 | | URL |
 |---|---|
-| **Play the game** (client on Vercel) | **`<add your Vercel URL here>`** |
-| Game server (Render) | `<add your Render URL here>` · health check: `<Render URL>/health` |
+| Game (Render) | `https://scribble-client-x4zy.onrender.com/` ·Backend health check: `https://scribble-game-3aex.onrender.com/health` |
 
 > The server runs on Render's free plan, so the first visit after a quiet period can take up to ~50 seconds
 > while it wakes up. The game shows "Connecting to server…" until then.
