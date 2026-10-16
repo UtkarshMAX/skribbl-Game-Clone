@@ -4,11 +4,6 @@ A real-time multiplayer drawing and guessing game built as part of a Full Stack 
 
 The application allows multiple players to join a room, take turns drawing a selected word, and compete by guessing the drawing before time runs out. The entire game state, drawing canvas, and player interactions are synchronized in real-time using WebSockets.
 
-<<<<<<< HEAD
-| | URL |
-|---|---|
-| Game (Render) | `https://scribble-client-x4zy.onrender.com/` ·Backend health check: `https://scribble-game-3aex.onrender.com/health` |
-=======
 ---
 
 ## Assignment Objective
@@ -26,10 +21,10 @@ Build an end-to-end clone of Scribbl.io featuring:
 
 ## Demo
 
-https://scribble-client-x4zy.onrender.com/
-
-Backend health check: https://scribble-game-3aex.onrender.com/health
->>>>>>> f0ffbf7 (Update After QA testing)
+| Component | URL |
+|---|---|
+| **Live Game (Render)** | [https://scribble-client-x4zy.onrender.com/](https://scribble-client-x4zy.onrender.com/) |
+| **Backend Health Check** | [https://scribble-game-3aex.onrender.com/health](https://scribble-game-3aex.onrender.com/health) |
 
 > The server runs on Render's free plan, so the first visit after a quiet period can take up to ~50 seconds
 > while it wakes up. The game shows "Connecting to server…" until then.
